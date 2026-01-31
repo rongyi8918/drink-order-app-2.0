@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>補習班快速簽到系統 v6</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>補習班快速簽到系統</h1>
+      <p>預先設定班級與學生，課程當天快速簽到</p>
+      <div class="header-actions">
+        <button onclick="exportData()" class="btn-export">匯出 CSV</button>
+        <button onclick="exportWord()" class="btn-export btn-export-word">匯出 Word（本週班程與出缺席）</button>
+      </div>
+    </header>
+
+    <!-- 模式切換 -->
+    <div class="mode-switcher">
+      <button id="modeSetup" class="mode-btn active">班級管理</button>
+      <button id="modeCheckin" class="mode-btn">快速簽到</button>
+    </div>
+
+    <!-- 模式1: 班級管理 -->
+    <div id="setupMode" class="mode-section">
+      <section class="card">
+        <h2>新增班級</h2>
+        <form id="classForm">
+          <div class="row">
+            <label>
+              班級名稱
+              <input type="text" id="className" placeholder="例如：A 班、數學進階班" required>
+            </label>
+            <label>
+              部別
+              <select id="classDepartment" required>
+                <option value="">請選擇</option>
+                <option value="junior">國中部</option>
+                <option value="senior">高中部</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label>
+              上課星期
+              <div class="weekdays">
+                <label class="checkbox-label"><input type="checkbox" value="0" class="weekday-check"> 週一</label>
+                <label class="checkbox-label"><input type="checkbox" value="1" class="weekday-check"> 週二</label>
+                <label class="checkbox-label"><input type="checkbox" value="2" class="weekday-check"> 週三</label>
+                <label class="checkbox-label"><input type="checkbox" value="3" class="weekday-check"> 週四</label>
+                <label class="checkbox-label"><input type="checkbox" value="4" class="weekday-check"> 週五</label>
+                <label class="checkbox-label"><input type="checkbox" value="5" class="weekday-check"> 週六</label>
+                <label class="checkbox-label"><input type="checkbox" value="6" class="weekday-check"> 週日</label>
+              </div>
+            </label>
+          </div>
+          <div class="row">
+            <label>上課時間 <input type="time" id="classStartTime" required></label>
+            <label>結束時間 <input type="time" id="classEndTime" required></label>
+          </div>
+          <button type="submit">新增班級</button>
+          <p id="classMessage" class="message"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>本週課程表</h2>
+        <div class="row align-center">
+          <label>選擇週次 <input type="date" id="weekSelector" value=""></label>
+          <button onclick="renderWeeklySchedule()" class="btn-refresh">更新</button>
+        </div>
+        <div id="weeklySchedule" class="schedule-container schedule-fullwidth"></div>
+      </section>
+
+      <section class="card">
+        <h2>班級列表</h2>
+        <div id="classList" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>新增學生</h2>
+        <form id="studentForm">
+          <div class="row">
+            <label>學生姓名 <input type="text" id="studentName" placeholder="例如：王小明" required></label>
+            <label>所屬班級 <select id="studentClass" required><option value="">請選擇班級</option></select></label>
+          </div>
+          <button type="submit">加入學生</button>
+          <p id="formMessage" class="message"></p>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>學生名單</h2>
+        <div class="row align-center">
+          <div class="filter">
+            <label>篩選班級</label>
+            <select id="classFilter"><option value="">全部班級</option></select>
+          </div>
+        </div>
+        <div id="studentList" class="list"></div>
+      </section>
+    </div>
+
+    <!-- 模式2: 快速簽到 -->
+    <div id="checkinMode" class="mode-section" style="display: none;">
+      <section class="card">
+        <h2>快速簽到</h2>
+        <div class="row align-center">
+          <label>點名日期 <input type="date" id="attendanceDate"></label>
+          <label>快速搜尋學生 <input type="text" id="searchStudent" placeholder="輸入姓名或班級搜尋..." autocomplete="off"></label>
+        </div>
+        <div id="searchResults" class="list"></div>
+      </section>
+
+      <section class="card">
+        <h2>今日簽到記錄</h2>
+        <div id="todayClassesInfo" class="info-box"></div>
+        <div class="row align-center">
+          <div class="filter"><label>班級</label><select id="checkinClassFilter"><option value="">全部（今日有課）</option></select></div>
+          <div class="filter"><label>狀態</label><select id="statusFilter"><option value="">全部</option><option value="present">已簽到</option><option value="absent">缺席</option><option value="none">未簽到</option></select></div>
+          <div class="filter"><label><input type="checkbox" id="showAllClasses"> 顯示所有班級</label></div>
+        </div>
+        <div id="attendanceList" class="list"></div>
+      </section>
+    </div>
+
+    <!-- 出缺席統計：國中部 / 高中部分表 -->
+    <section class="card">
+      <h2>出缺勤統計</h2>
+      <h3 class="section-title">國中部</h3>
+      <div id="summaryJunior" class="summary-table-container"></div>
+      <h3 class="section-title">高中部</h3>
+      <div id="summarySenior" class="summary-table-container"></div>
+    </section>
+  </div>
+
+  <!-- 調補課彈窗 -->
+  <div id="scheduleModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">調補課設定</h3>
+        <button class="modal-close" onclick="closeScheduleModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modalClassInfo" class="modal-info"></div>
+        <div class="modal-actions">
+          <button onclick="handleScheduleAction('cancel')" class="btn-action btn-cancel">取消課程</button>
+          <button onclick="handleScheduleAction('makeup')" class="btn-action btn-makeup">補課</button>
+          <button onclick="handleScheduleAction('reschedule')" class="btn-action btn-reschedule">調課</button>
+          <button onclick="handleScheduleAction('clear')" class="btn-action btn-clear">清除變更</button>
+        </div>
+        <div id="modalDateInput" class="modal-date-input" style="display: none;">
+          <label>新日期 <input type="date" id="newDateInput"></label>
+          <div class="modal-date-actions">
+            <button onclick="confirmScheduleChange()" class="btn-confirm">確認</button>
+            <button onclick="cancelDateInput()" class="btn-cancel-action">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 請假備註彈窗（含請假原因、由簽到錄入的請假日期） -->
+  <div id="leaveNoteModal" class="modal" style="display: none;">
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h3 id="leaveNoteTitle">請假備註</h3>
+        <button class="modal-close" onclick="closeLeaveNoteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="leaveNoteInfo" class="modal-info"></div>
+        <p class="meta">以下為簽到記錄中的缺席日期，可填寫請假原因及是否補課。</p>
+        <div id="absentNotesList" class="absent-notes-list"></div>
+        <div class="leave-note-form" style="margin-top:16px;">
+          <h4>新增／編輯單筆</h4>
+          <label>請假日期 <input type="date" id="leaveDateInput"></label>
+          <label>請假原因 <input type="text" id="leaveReasonInput" placeholder="例如：生病、事假"></label>
+          <label class="checkbox-row"><input type="checkbox" id="hasMakeupCheck"><span>已補課</span></label>
+          <div id="makeupDateContainer" style="display: none;">
+            <label>補課日期 <input type="date" id="makeupDateInput"></label>
+          </div>
+          <div class="modal-date-actions">
+            <button onclick="saveLeaveNote()" class="btn-confirm">儲存</button>
+            <button onclick="closeLeaveNoteModal()" class="btn-cancel-action">取消</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./script-v6.js"></script>
+</body>
+</html>
